@@ -1,21 +1,27 @@
 
+
 import streamlit as st
 import numpy as np
-from PIL import Image, UnidentifiedImageError
-from tensorflow.keras.applications.mobilenet_v2 import (
-    MobileNetV2,
-    preprocess_input,
+from PIL import Image, ImageOps, UnidentifiedImageError
+from tensorflow.keras.applications.efficientnet_v2 import (
+    EfficientNetV2B0,
     decode_predictions
 )
 
-# Page configuration
+# =====================================
+# PAGE CONFIGURATION
+# =====================================
+
 st.set_page_config(
     page_title="AI Image Classifier",
     page_icon="🧠",
     layout="wide"
 )
 
-# Custom styling
+# =====================================
+# CUSTOM CSS DESIGN
+# =====================================
+
 st.markdown("""
 <style>
 .stApp {
@@ -29,17 +35,16 @@ st.markdown("""
 }
 
 .hero {
-    text-align: center;
-    padding: 32px 16px;
     background: linear-gradient(135deg, #1e293b, #312e81);
     border-radius: 18px;
-    margin-bottom: 28px;
+    padding: 40px 20px;
+    text-align: center;
+    margin-bottom: 30px;
 }
 
 .hero h1 {
-    color: #ffffff;
+    color: white;
     font-size: 42px;
-    margin-bottom: 10px;
 }
 
 .hero p {
@@ -48,16 +53,16 @@ st.markdown("""
 }
 
 .stButton > button {
-    background: #6366f1;
+    background-color: #6366f1;
     color: white;
     border-radius: 10px;
-    border: none;
     padding: 10px 24px;
-    font-weight: 600;
+    font-weight: bold;
+    border: none;
 }
 
 .stButton > button:hover {
-    background: #4f46e5;
+    background-color: #4f46e5;
     color: white;
 }
 
@@ -66,148 +71,302 @@ st.markdown("""
     border-radius: 12px;
     padding: 12px;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
-# Header
+# =====================================
+# APPLICATION HEADER
+# =====================================
+
 st.markdown("""
 <div class="hero">
     <h1>🧠 AI Image Classifier</h1>
     <p>
-        Discover what is inside your images using
-        Convolutional Neural Networks.
+        Intelligent Image Recognition Using
+        EfficientNetV2 Deep Learning
     </p>
 </div>
 """, unsafe_allow_html=True)
 
-# Sidebar
+# =====================================
+# SIDEBAR
+# =====================================
+
 with st.sidebar:
+
     st.title("🔍 About This Project")
+
     st.write(
-        "An AI-powered image classification application "
-        "built with Python, TensorFlow and Streamlit."
+        "An AI-powered image classification "
+        "application built with Python, "
+        "TensorFlow and Streamlit."
     )
 
     st.divider()
 
-    st.subheader("Model Information")
-    st.write("**Architecture:** MobileNetV2")
-    st.write("**Model Type:** CNN")
-    st.write("**Training Dataset:** ImageNet")
+    st.subheader("🤖 Model Information")
+
+    st.write("**Architecture:** EfficientNetV2B0")
+    st.write("**Type:** Convolutional Neural Network")
+    st.write("**Dataset:** ImageNet")
     st.write("**Input Size:** 224 × 224")
-    st.write("**Classes:** 1,000")
+    st.write("**Categories:** 1,000")
 
     st.divider()
-    st.caption("Powered by TensorFlow and Streamlit")
 
-# Load the model once
+    st.subheader("✨ Features")
+
+    st.write("✅ AI Image Recognition")
+    st.write("✅ CNN Deep Learning")
+    st.write("✅ Top 3 Predictions")
+    st.write("✅ Confidence Scores")
+    st.write("✅ Image Preprocessing")
+
+    st.divider()
+
+    st.caption("Built with TensorFlow and Streamlit")
+
+# =====================================
+# LOAD EFFICIENTNET MODEL
+# =====================================
+
 @st.cache_resource
 def load_model():
-    return MobileNetV2(weights="imagenet")
 
-# Main application
+    model = EfficientNetV2B0(
+        weights="imagenet",
+        include_top=True,
+        include_preprocessing=True
+    )
+
+    return model
+
+# =====================================
+# IMAGE PREPROCESSING
+# =====================================
+
+def preprocess_image(image):
+
+    # Fix image orientation
+    image = ImageOps.exif_transpose(image)
+
+    # Convert to RGB
+    image = image.convert("RGB")
+
+    # Resize while preserving proportions
+    image = ImageOps.pad(
+        image,
+        (224, 224),
+        method=Image.Resampling.BICUBIC,
+        color=(0, 0, 0)
+    )
+
+    # Convert image to NumPy array
+    image_array = np.asarray(
+        image,
+        dtype=np.float32
+    )
+
+    # Add batch dimension
+    image_array = np.expand_dims(
+        image_array,
+        axis=0
+    )
+
+    # EfficientNetV2 includes preprocessing
+    # internally and expects values 0-255.
+
+    return image_array
+
+# =====================================
+# IMAGE UPLOAD SECTION
+# =====================================
+
 st.subheader("📤 Upload Your Image")
-st.write("Choose a JPG, JPEG or PNG image to classify.")
+
+st.write(
+    "Upload a JPG, JPEG or PNG image "
+    "and let AI identify the object."
+)
 
 uploaded_file = st.file_uploader(
-    "Select an image",
+    "Choose an image",
     type=["jpg", "jpeg", "png"]
 )
 
-if uploaded_file is not None:
-    try:
-        image = Image.open(uploaded_file).convert("RGB")
+# =====================================
+# CLASSIFICATION SECTION
+# =====================================
 
-        col1, col2 = st.columns(2, gap="large")
+if uploaded_file is not None:
+
+    try:
+
+        image = Image.open(uploaded_file)
+        image = ImageOps.exif_transpose(image)
+        image = image.convert("RGB")
+
+        col1, col2 = st.columns(
+            2,
+            gap="large"
+        )
 
         with col1:
+
             st.subheader("🖼️ Image Preview")
+
             st.image(
                 image,
-                caption="Your uploaded image",
+                caption="Uploaded Image",
                 use_container_width=True
             )
 
         with col2:
+
             st.subheader("🤖 AI Analysis")
-            st.success("Image uploaded successfully!")
 
-            if st.button(
+            st.success(
+                "Image uploaded successfully!"
+            )
+
+            classify = st.button(
                 "🚀 Classify Image",
-                type="primary"
-            ):
-                with st.spinner("AI is analysing your image..."):
+                type="primary",
+                use_container_width=True
+            )
 
-                    # Image preprocessing
-                    img = image.resize((224, 224))
-                    img_array = np.asarray(
-                        img, dtype=np.float32
+            if classify:
+
+                try:
+
+                    with st.spinner(
+                        "AI is analysing your image..."
+                    ):
+
+                        # Load CNN model
+                        model = load_model()
+
+                        # Prepare input
+                        processed_image = preprocess_image(
+                            image
+                        )
+
+                        # Generate predictions
+                        predictions = model.predict(
+                            processed_image,
+                            verbose=0
+                        )
+
+                        # Decode ImageNet predictions
+                        results = decode_predictions(
+                            predictions,
+                            top=3
+                        )[0]
+
+                    st.success(
+                        "Classification completed!"
                     )
-                    img_array = np.expand_dims(
-                        img_array, axis=0
-                    )
-                    img_array = preprocess_input(img_array)
 
-                    # CNN predictions
-                    model = load_model()
-                    predictions = model.predict(
-                        img_array, verbose=0
+                    st.subheader(
+                        "📊 Prediction Results"
                     )
 
-                    results = decode_predictions(
-                        predictions, top=3
-                    )[0]
+                    # Display top 3 predictions
+                    for rank, (_, label, confidence) in enumerate(
+                        results,
+                        start=1
+                    ):
 
-                st.success("Classification complete!")
-                st.subheader("📊 Prediction Results")
+                        clean_label = (
+                            label.replace("_", " ").title()
+                        )
 
-                for rank, (_, label, confidence) in enumerate(
-                    results, start=1
-                ):
-                    label = label.replace("_", " ").title()
+                        st.write(
+                            f"**{rank}. {clean_label}** "
+                            f"— {confidence * 100:.2f}%"
+                        )
 
-                    st.write(
-                        f"**{rank}. {label}** "
-                        f"— {confidence * 100:.2f}%"
+                        st.progress(
+                            float(confidence)
+                        )
+
+                    # Highest prediction
+                    best_label = (
+                        results[0][1]
+                        .replace("_", " ")
+                        .title()
                     )
 
-                    st.progress(float(confidence))
+                    best_confidence = (
+                        float(results[0][2]) * 100
+                    )
 
-                best_label = results[0][1]
-                best_label = best_label.replace(
-                    "_", " "
-                ).title()
+                    st.info(
+                        f"🏆 Top Prediction: {best_label}"
+                    )
 
-                st.info(
-                    f"🏆 Top Prediction: {best_label}"
-                )
+                    st.metric(
+                        "Top Prediction Confidence",
+                        f"{best_confidence:.2f}%"
+                    )
 
-                st.caption(
-                    "Confidence scores represent model "
-                    "predictions, not guaranteed accuracy."
-                )
+                    if best_confidence < 40:
+                        st.warning(
+                            "The model has low confidence "
+                            "in its top prediction. "
+                            "Try a clearer image."
+                        )
 
-    except (UnidentifiedImageError, OSError, ValueError):
+                    st.caption(
+                        "Predictions come from 1,000 "
+                        "ImageNet categories. Confidence "
+                        "does not guarantee correctness."
+                    )
+
+                except Exception as error:
+
+                    st.error(
+                        "The model could not complete "
+                        "classification."
+                    )
+
+                    st.exception(error)
+
+    except (
+        UnidentifiedImageError,
+        OSError,
+        ValueError
+    ):
+
         st.error(
-            "The image could not be opened. "
-            "Please upload a valid JPG or PNG file."
-        )
-
-    except Exception:
-        st.error(
-            "Classification failed. Please check "
-            "your model installation and app logs."
+            "Invalid image. Please upload "
+            "a valid JPG or PNG file."
         )
 
 else:
-    st.info("👆 Upload an image above to get started.")
 
-# Footer
+    st.info(
+        "👆 Upload an image above to get started."
+    )
+
+# =====================================
+# FOOTER
+# =====================================
+
 st.divider()
+
 st.markdown(
-    "<p style='text-align:center;color:#94a3b8;'>"
-    "AI Image Classification | Built with Streamlit"
-    "</p>",
+    """
+    <p style="
+        text-align:center;
+        color:#94a3b8;
+        font-size:14px;
+    ">
+        AI Image Classification |
+        EfficientNetV2 CNN |
+        Built with Streamlit
+    </p>
+    """,
     unsafe_allow_html=True
 )
-
